@@ -46,7 +46,7 @@ class StudentController extends BaseController
             $recommendations[] = 'Excelente desempeño, continúa con el mismo enfoque.';
         }
 
-        return view('dashboard.student', compact('scores', 'alerts', 'average', 'recommendations'));
+        return view('dashboard.student', compact('user', 'scores', 'alerts', 'average', 'recommendations'));
     }
 
     public function aiChat(Request $request)

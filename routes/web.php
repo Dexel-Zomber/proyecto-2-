@@ -54,6 +54,8 @@ Route::middleware('role:teacher')->group(function () {
     Route::get('/teacher', [TeacherController::class, 'index'])->name('teacher');
     Route::post('/teacher/scores', [TeacherController::class, 'storeScore'])->name('teacher.scores.store');
     Route::delete('/teacher/scores/{score}', [TeacherController::class, 'destroyScore'])->name('teacher.scores.delete');
+    Route::patch('/teacher/alerts/{alert}/resolve', [TeacherController::class, 'resolveAlert'])->name('teacher.alerts.resolve');
+    Route::patch('/teacher/alerts/{alert}/unresolve', [TeacherController::class, 'unresolveAlert'])->name('teacher.alerts.unresolve');
 });
 
 Route::middleware('role:student')->group(function () {

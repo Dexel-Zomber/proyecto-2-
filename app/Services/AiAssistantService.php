@@ -29,17 +29,31 @@ class AiAssistantService
         }
 
         try {
+            $model = config('services.groq.model');
+
+            $payload = [
+                'model' => $model,
+                // Los modelos "razonadores" (gpt-oss) consumen parte de max_tokens
+                // pensando internamente antes de escribir la respuesta visible.
+                // Le damos más margen para que no se quede sin espacio y devuelva vacío.
+                'max_tokens' => max($maxTokens, 600),
+                'temperature' => 0.4,
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+            ];
+
+            // reasoning_effort solo lo soportan los modelos gpt-oss de Groq.
+            // Lo ponemos en "low" para que gasten pocos tokens pensando y dejen
+            // presupuesto de sobra para la respuesta que sí vemos.
+            if (str_contains($model, 'gpt-oss')) {
+                $payload['reasoning_effort'] = 'low';
+            }
+
             $response = Http::withToken(config('services.groq.key'))
-                ->timeout(15)
-                ->post('https://api.groq.com/openai/v1/chat/completions', [
-                    'model' => config('services.groq.model'),
-                    'max_tokens' => $maxTokens,
-                    'temperature' => 0.4,
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $userPrompt],
-                    ],
-                ]);
+                ->timeout(20)
+                ->post('https://api.groq.com/openai/v1/chat/completions', $payload);
 
             if ($response->failed()) {
                 Log::warning('Groq API error', ['status' => $response->status(), 'body' => $response->body()]);
@@ -47,7 +61,15 @@ class AiAssistantService
                 return null;
             }
 
-            return trim($response->json('choices.0.message.content') ?? '') ?: null;
+            $content = trim($response->json('choices.0.message.content') ?? '');
+
+            if ($content === '') {
+                Log::warning('Groq API returned empty content', ['model' => $model, 'response' => $response->json()]);
+
+                return null;
+            }
+
+            return $content;
         } catch (\Throwable $e) {
             Log::warning('Groq API exception: '.$e->getMessage());
 

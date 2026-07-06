@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alert;
 use App\Models\Score;
 use App\Models\Subject;
 use App\Models\User;
@@ -26,7 +27,24 @@ class TeacherController extends BaseController
             return $subject->students;
         })->unique('id');
 
-        return view('dashboard.teacher', compact('subjects', 'students'));
+        // Estudiantes inscritos que aún no tienen ninguna nota registrada,
+        // agrupados por materia, para que el profesor los detecte fácil.
+        $pendingBySubject = $subjects->mapWithKeys(function ($subject) {
+            $gradedIds = $subject->scores->pluck('student_id')->unique();
+
+            return [$subject->id => $subject->students->reject(fn ($s) => $gradedIds->contains($s->id))];
+        });
+
+        // Alertas de los estudiantes matriculados en las materias de este profesor,
+        // sin resolver primero, para que las vea de inmediato en su panel.
+        $subjectIds = $subjects->pluck('id');
+        $alerts = Alert::whereIn('subject_id', $subjectIds)
+            ->with(['student', 'subject'])
+            ->orderBy('resolved')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return view('dashboard.teacher', compact('user', 'subjects', 'students', 'pendingBySubject', 'alerts'));
     }
 
     public function storeScore(Request $request)
@@ -80,5 +98,39 @@ class TeacherController extends BaseController
         $score->delete();
 
         return back()->with('message', 'Nota eliminada correctamente');
+    }
+
+    public function resolveAlert(Alert $alert)
+    {
+        $user = $this->currentUser();
+
+        if (! $user || ! $user->isTeacher()) {
+            return redirect('/login');
+        }
+
+        if (! $alert->subject || $alert->subject->teacher_id !== $user->id) {
+            return back()->withErrors(['alert' => 'No tienes permiso para modificar esta alerta.']);
+        }
+
+        $alert->update(['resolved' => true]);
+
+        return back()->with('message', 'Alerta marcada como resuelta');
+    }
+
+    public function unresolveAlert(Alert $alert)
+    {
+        $user = $this->currentUser();
+
+        if (! $user || ! $user->isTeacher()) {
+            return redirect('/login');
+        }
+
+        if (! $alert->subject || $alert->subject->teacher_id !== $user->id) {
+            return back()->withErrors(['alert' => 'No tienes permiso para modificar esta alerta.']);
+        }
+
+        $alert->update(['resolved' => false]);
+
+        return back()->with('message', 'Alerta marcada como no resuelta');
     }
 }
