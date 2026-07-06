@@ -51,12 +51,22 @@ class AiAssistantService
                 $payload['reasoning_effort'] = 'low';
             }
 
-            $response = Http::withToken(config('services.groq.key'))
-                ->timeout(20)
-                ->post('https://api.groq.com/openai/v1/chat/completions', $payload);
+            $http = Http::withToken(config('services.groq.key'))->timeout(20);
+
+            // En Windows, PHP muchas veces no trae el paquete de certificados raíz
+            // instalado, lo que rompe TODAS las peticiones HTTPS salientes con
+            // "SSL certificate problem: unable to get local issuer certificate".
+            // Desactivamos la verificación SOLO en entorno local para no bloquear
+            // el desarrollo; en producción esto debe ir siempre activado.
+            if (app()->environment('local')) {
+                $http = $http->withoutVerifying();
+            }
+
+            $response = $http->post('https://api.groq.com/openai/v1/chat/completions', $payload);
 
             if ($response->failed()) {
                 Log::warning('Groq API error', ['status' => $response->status(), 'body' => $response->body()]);
+
 
                 return null;
             }
