@@ -34,6 +34,10 @@
                 <span class="icon">📁</span>
                 <span>Reportes</span>
             </button>
+            <button type="button" class="sidebar-link" data-tab="audit">
+                <span class="icon">LOG</span>
+                <span>Auditoria</span>
+            </button>
             <button type="button" class="sidebar-link" data-tab="settings">
                 <span class="icon">⚙️</span>
                 <span>Configuración IA</span>
@@ -128,6 +132,33 @@
             </section>
 
             <section class="tab-panel" data-tab="users">
+                @if(session('importSummary'))
+                    @php
+                        $summary = session('importSummary');
+                    @endphp
+                    <div class="module-card" style="margin-bottom: 20px;">
+                        <div class="module-header">
+                            <h3>{{ $summary['title'] }}</h3>
+                            <p>
+                                Creados: {{ $summary['created'] }} · Actualizados: {{ $summary['updated'] }}
+                                @if(($summary['courses_created'] ?? 0) > 0)
+                                    · Cursos creados: {{ $summary['courses_created'] }}
+                                @endif
+                                · Errores: {{ count($summary['errors']) }}
+                            </p>
+                        </div>
+                        @if(!empty($summary['errors']))
+                            <div class="activity-list">
+                                @foreach(array_slice($summary['errors'], 0, 8) as $error)
+                                    <div class="activity-item">
+                                        <span class="activity-title">{{ $error }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
                 <div class="section-split">
                     <div class="module-card">
                         <div class="module-header">
@@ -145,7 +176,7 @@
                                 <option value="teacher">Profesor</option>
                                 <option value="student">Estudiante</option>
                             </select>
-                            <label>Curso</label>
+                            <label>Curso / paralelo</label>
                             <select name="course_id" class="select">
                                 <option value="">Sin curso</option>
                                 @foreach($courses as $course)
@@ -171,6 +202,19 @@
                     </div>
                 </div>
 
+                <div class="module-card" style="margin-bottom: 20px;">
+                    <div class="module-header">
+                        <h3>Importar estudiantes</h3>
+                        <p>Columnas: nombre, email, password. Puedes agregar curso como grupo/paralelo; si no existe, se crea automaticamente.</p>
+                    </div>
+                    <form method="post" action="{{ route('admin.users.import') }}" enctype="multipart/form-data" class="stacked-form">
+                        @csrf
+                        <label>Archivo CSV</label>
+                        <input type="file" name="students_file" class="input" accept=".csv,text/csv,text/plain" required />
+                        <button type="submit" class="btn btn-secondary btn-block">Importar estudiantes</button>
+                    </form>
+                </div>
+
                 <div class="table-panel">
                     <div class="table-panel-header">
                         <h3>Estudiantes</h3>
@@ -182,7 +226,7 @@
                                 <tr>
                                     <th>Nombre</th>
                                     <th>Correo</th>
-                                    <th>Curso</th>
+                                    <th>Curso / paralelo</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -223,7 +267,7 @@
                                 <tr>
                                     <th>Nombre</th>
                                     <th>Correo</th>
-                                    <th>Curso</th>
+                                    <th>Curso / paralelo</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -264,31 +308,31 @@
                 <div class="section-split">
                     <div class="module-card">
                         <div class="module-header">
-                            <h3>Crear curso</h3>
-                            <p>Define un nuevo curso institucional.</p>
+                            <h3>Crear curso / paralelo</h3>
+                            <p>Define grupos como Primero A, Segundo B o Tercero Informatica. Los parciales se manejan en las notas.</p>
                         </div>
                         <form action="{{ route('admin.courses.store') }}" method="post" class="stacked-form">
                             @csrf
-                            <label>Nombre del curso</label>
+                            <label>Nombre del curso / paralelo</label>
                             <input type="text" name="name" class="input" value="{{ old('name') }}" required />
                             <label>Descripción</label>
                             <textarea name="description" class="textarea">{{ old('description') }}</textarea>
-                            <button type="submit" class="btn btn-primary btn-block">Crear curso</button>
+                            <button type="submit" class="btn btn-primary btn-block">Crear curso / paralelo</button>
                         </form>
                     </div>
 
                     <div class="module-card">
                         <div class="module-header">
                             <h3>Crear materia</h3>
-                            <p>Asigna materia a curso y profesor.</p>
+                            <p>Asigna una materia a un curso/paralelo y a un profesor.</p>
                         </div>
                         <form action="{{ route('admin.subjects.store') }}" method="post" class="stacked-form">
                             @csrf
                             <label>Nombre de la materia</label>
                             <input type="text" name="name" class="input" required />
-                            <label>Curso</label>
+                            <label>Curso / paralelo</label>
                             <select name="course_id" class="select" required>
-                                <option value="">Selecciona un curso</option>
+                                <option value="">Selecciona un curso / paralelo</option>
                                 @foreach($courses as $course)
                                     <option value="{{ $course->id }}">{{ $course->name }}</option>
                                 @endforeach
@@ -307,8 +351,8 @@
 
                 <div class="table-panel">
                     <div class="table-panel-header">
-                        <h3>Listado de cursos</h3>
-                        <span>{{ $courses->count() }} cursos</span>
+                        <h3>Listado de cursos / paralelos</h3>
+                        <span>{{ $courses->count() }} registros</span>
                     </div>
                     <div class="table-scroll">
                         <table class="table">
@@ -352,7 +396,7 @@
                             <thead>
                                 <tr>
                                     <th>Materia</th>
-                                    <th>Curso</th>
+                                    <th>Curso / paralelo</th>
                                     <th>Profesor</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -449,7 +493,7 @@
             <section class="tab-panel" data-tab="alerts">
                 <form method="get" action="{{ route('admin') }}" class="filters-panel">
                     <div class="filter-group">
-                        <label>Curso</label>
+                        <label>Curso / paralelo</label>
                         <select name="filter_course" class="select">
                             <option value="">Todos</option>
                             @foreach($courses as $course)
@@ -521,11 +565,11 @@
             <section class="tab-panel" data-tab="reports">
                 <div class="report-grid">
                     <div class="report-card">
-                        <h3>Reporte por curso</h3>
+                        <h3>Reporte por curso / paralelo</h3>
                         <form action="{{ route('admin.reports.course') }}#report-section" method="get" class="stacked-form">
-                            <label>Selecciona un curso</label>
+                            <label>Selecciona un curso / paralelo</label>
                             <select name="course_id" class="select" required>
-                                <option value="">Selecciona un curso</option>
+                                <option value="">Selecciona un curso / paralelo</option>
                                 @foreach($courses as $course)
                                     <option value="{{ $course->id }}">{{ $course->name }}</option>
                                 @endforeach
@@ -558,16 +602,27 @@
                             </select>
                             <button type="submit" class="btn btn-primary btn-block">Ver reporte</button>
                         </form>
-                        <div class="export-actions">
-                            <button type="button" class="btn btn-secondary btn-small">Exportar PDF</button>
-                            <button type="button" class="btn btn-secondary btn-small">Exportar Excel</button>
-                        </div>
                     </div>
                 </div>
 
                 @if(isset($report))
                     <div id="report-section" class="report-summary-card">
-                        <h3>{{ $report['title'] }}</h3>
+                        <div class="report-header-actions">
+                            <h3>{{ $report['title'] }}</h3>
+                            @if($report['type'] === 'course')
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.course.pdf', $report['course']->id) }}">Exportar PDF</a>
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.course.excel', $report['course']->id) }}">Exportar Excel</a>
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.course.xml', $report['course']->id) }}">Exportar XML</a>
+                            @elseif($report['type'] === 'teacher')
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.teacher.pdf', $report['teacher']->id) }}">Exportar PDF</a>
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.teacher.excel', $report['teacher']->id) }}">Exportar Excel</a>
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.teacher.xml', $report['teacher']->id) }}">Exportar XML</a>
+                            @elseif($report['type'] === 'student')
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.student.pdf', $report['student']->id) }}">Exportar PDF</a>
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.student.excel', $report['student']->id) }}">Exportar Excel</a>
+                                <a class="btn btn-secondary btn-small" href="{{ route('admin.reports.student.xml', $report['student']->id) }}">Exportar XML</a>
+                            @endif
+                        </div>
 
                         @if(!empty($report['ai_summary']))
                             <div class="card" style="padding:14px; background:#eff7ff; box-shadow:none; margin-bottom:16px;">
@@ -615,7 +670,7 @@
                         @elseif($report['type'] === 'student')
                             <div class="report-details-row">
                                 <div>
-                                    <strong>Curso:</strong> {{ $report['student']->course?->name ?? 'N/A' }}
+                                    <strong>Curso / paralelo:</strong> {{ $report['student']->course?->name ?? 'N/A' }}
                                 </div>
                                 <div>
                                     <strong>Promedio general:</strong> {{ $report['average'] }}
@@ -625,7 +680,7 @@
                                 <thead>
                                     <tr>
                                         <th>Materia</th>
-                                        <th>Curso</th>
+                                        <th>Curso / paralelo</th>
                                         <th>Nota</th>
                                     </tr>
                                 </thead>
@@ -652,6 +707,44 @@
                         @endif
                     </div>
                 @endif
+            </section>
+
+            <section class="tab-panel" data-tab="audit">
+                <div class="table-panel">
+                    <div class="table-panel-header" style="padding: 20px 20px 0;">
+                        <h3>Auditoria de acciones</h3>
+                        <span class="status-chip status-success">{{ $auditLogs->count() }} registros recientes</span>
+                    </div>
+
+                    @if($auditLogs->isEmpty())
+                        <p class="muted" style="padding: 0 20px 20px;">Aun no hay acciones registradas.</p>
+                    @else
+                        <div class="table-scroll">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Usuario</th>
+                                        <th>Rol</th>
+                                        <th>Accion</th>
+                                        <th>Detalle</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($auditLogs as $log)
+                                        <tr>
+                                            <td>{{ $log->created_at->format('d/m/Y H:i') }}</td>
+                                            <td>{{ $log->user?->name ?? 'Sistema' }}</td>
+                                            <td>{{ $log->role ?? 'N/A' }}</td>
+                                            <td><span class="status-chip status-warning">{{ $log->action }}</span></td>
+                                            <td>{{ $log->description }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
             </section>
 
             <section class="tab-panel" data-tab="settings">
@@ -722,7 +815,7 @@
                 <option value="student">Estudiante</option>
                 <option value="teacher">Profesor</option>
             </select>
-            <label>Curso</label>
+            <label>Curso / paralelo</label>
             <select name="course_id" id="edit-user-course" class="select">
                 <option value="">Sin curso</option>
                 @foreach($courses as $course)
@@ -739,13 +832,13 @@
 <div id="edit-course-modal" class="modal-overlay">
     <div class="modal-card">
         <div class="modal-header">
-            <h3>Editar curso</h3>
+            <h3>Editar curso / paralelo</h3>
             <button type="button" class="btn btn-secondary btn-small" data-modal-close="edit-course-modal">Cerrar</button>
         </div>
         <form id="edit-course-form" method="post" class="stacked-form">
             @csrf
             @method('PATCH')
-            <label>Nombre del curso</label>
+            <label>Nombre del curso / paralelo</label>
             <input type="text" name="name" id="edit-course-name" class="input" required />
             <label>Descripción</label>
             <textarea name="description" id="edit-course-description" class="textarea"></textarea>
@@ -765,7 +858,7 @@
             @method('PATCH')
             <label>Nombre de la materia</label>
             <input type="text" name="name" id="edit-subject-name" class="input" required />
-            <label>Curso</label>
+            <label>Curso / paralelo</label>
             <select name="course_id" id="edit-subject-course" class="select" required>
                 @foreach($courses as $course)
                     <option value="{{ $course->id }}">{{ $course->name }}</option>

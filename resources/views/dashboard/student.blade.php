@@ -79,6 +79,15 @@
                         <strong>{{ $unresolvedCount }}</strong>
                         <p>Casos que requieren tu atención.</p>
                     </article>
+                    <article class="kpi-card">
+                        <span class="kpi-label">Riesgo academico</span>
+                        <strong>{{ $riskProfile['score'] }}/100</strong>
+                        <p>
+                            <span class="status-chip status-{{ $riskProfile['severity'] }}">
+                                {{ $riskProfile['level'] }}
+                            </span>
+                        </p>
+                    </article>
                 </div>
 
                 <div class="summary-grid">
@@ -113,15 +122,34 @@
                     <div class="summary-card stretch-card">
                         <div class="summary-card-header">
                             <div>
-                                <p class="eyebrow">Sistema de alertas</p>
-                                <h3>Recomendaciones</h3>
+                                <p class="eyebrow">IA academica</p>
+                                <h3>Riesgo y recomendaciones</h3>
                             </div>
                         </div>
                         <div class="activity-list">
+                            @if(!empty($riskProfile['ai_summary']))
+                                <div class="activity-item" style="align-items: flex-start; background: #eff6ff;">
+                                    <div>
+                                        <span class="activity-title">Analisis IA</span>
+                                        <span class="activity-meta">{{ $riskProfile['ai_summary'] }}</span>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @foreach($riskProfile['reasons'] as $reason)
+                                <div class="activity-item">
+                                    <div>
+                                        <span class="activity-title">{{ $reason }}</span>
+                                        <span class="activity-meta">Factor considerado para tu nivel de riesgo.</span>
+                                    </div>
+                                </div>
+                            @endforeach
+
                             @forelse($recommendations as $recommendation)
                                 <div class="activity-item">
                                     <div>
                                         <span class="activity-title">{{ $recommendation }}</span>
+                                        <span class="activity-meta">Recomendacion personalizada.</span>
                                     </div>
                                 </div>
                             @empty

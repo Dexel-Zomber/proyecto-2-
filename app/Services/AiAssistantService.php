@@ -67,7 +67,6 @@ class AiAssistantService
             if ($response->failed()) {
                 Log::warning('Groq API error', ['status' => $response->status(), 'body' => $response->body()]);
 
-
                 return null;
             }
 
@@ -100,9 +99,9 @@ class AiAssistantService
         $valuesText = implode(', ', array_map(fn ($v) => number_format((float) $v, 1), $values));
 
         $user = "Estudiante: {$studentName}\n"
-            ."Materia: ".($subjectName ?? 'General')."\n"
+            .'Materia: '.($subjectName ?? 'General')."\n"
             ."Últimas calificaciones (de la más reciente a la más antigua): {$valuesText}\n"
-            ."Promedio actual: ".round($average, 1)."\n"
+            .'Promedio actual: '.round($average, 1)."\n"
             ."Umbral de advertencia: {$warning}, umbral crítico: {$danger}\n"
             ."Tendencia detectada: {$trend}\n\n"
             .'Redacta una alerta breve y una recomendación concreta y accionable para el estudiante.';
@@ -153,6 +152,26 @@ class AiAssistantService
 
         $user = "Tipo de reporte: {$type}\nTítulo: {$title}\nDatos (JSON): {$rowsText}\n\n"
             .'Genera el resumen ejecutivo.';
+
+        return self::complete($system, $user, 220);
+    }
+
+    public static function riskSummary(User $student, array $riskProfile): ?string
+    {
+        if (! self::isConfigured()) {
+            return null;
+        }
+
+        $system = 'Eres un orientador academico. Redacta en espanol una recomendacion breve, concreta y motivadora. '
+            .'Usa solo los datos entregados y no prometas resultados garantizados.';
+
+        $user = "Estudiante: {$student->name}\n"
+            .'Promedio: '.$riskProfile['average']."\n"
+            .'Nivel de riesgo: '.$riskProfile['level']."\n"
+            .'Puntaje de riesgo: '.$riskProfile['risk_score']."/100\n"
+            .'Motivos: '.json_encode($riskProfile['reasons'], JSON_UNESCAPED_UNICODE)."\n"
+            .'Recomendaciones base: '.json_encode($riskProfile['recommendations'], JSON_UNESCAPED_UNICODE)."\n\n"
+            .'Genera una explicacion de maximo 3 frases para el estudiante.';
 
         return self::complete($system, $user, 220);
     }

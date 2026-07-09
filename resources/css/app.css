@@ -459,6 +459,14 @@ label {
     margin: 0;
 }
 
+.report-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
 .activity-list {
     display: grid;
     gap: 14px;

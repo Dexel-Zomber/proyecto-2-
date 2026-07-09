@@ -90,7 +90,7 @@
                             </div>
                         </div>
                         <div class="activity-list">
-                            @forelse($subjects as $subject)
+                            @foreach($subjects as $subject)
                                 @php $pending = $pendingBySubject[$subject->id] ?? collect(); @endphp
                                 @if($pending->isNotEmpty())
                                     <div class="activity-item">
@@ -101,8 +101,7 @@
                                         <span class="status-chip status-warning">{{ $pending->count() }}</span>
                                     </div>
                                 @endif
-                            @empty
-                            @endforelse
+                            @endforeach
 
                             @if($totalPending === 0)
                                 <p class="muted">Todos tus estudiantes ya tienen al menos una nota registrada.</p>
@@ -138,6 +137,27 @@
 
             {{-- ===================== REGISTRAR NOTA ===================== --}}
             <section class="tab-panel" data-tab="grade">
+                @if(session('importSummary'))
+                    @php
+                        $summary = session('importSummary');
+                    @endphp
+                    <div class="module-card" style="margin-bottom: 20px;">
+                        <div class="module-header">
+                            <h3>{{ $summary['title'] }}</h3>
+                            <p>Creadas: {{ $summary['created'] }} · Actualizadas: {{ $summary['updated'] }} · Errores: {{ count($summary['errors']) }}</p>
+                        </div>
+                        @if(!empty($summary['errors']))
+                            <div class="activity-list">
+                                @foreach(array_slice($summary['errors'], 0, 8) as $error)
+                                    <div class="activity-item">
+                                        <span class="activity-title">{{ $error }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
                 <div class="module-card">
                     <div class="module-header">
                         <div>
@@ -174,11 +194,26 @@
                         <button type="submit" class="btn btn-primary btn-block">Guardar nota</button>
                     </form>
                 </div>
+
+                <div class="module-card" style="margin-top: 20px;">
+                    <div class="module-header">
+                        <div>
+                            <h3>Importar notas</h3>
+                            <p>Columnas: email_estudiante, materia, curso, parcial, nota. Curso es opcional, pero si lo incluyes debe ir en esa posicion.</p>
+                        </div>
+                    </div>
+                    <form action="{{ route('teacher.scores.import') }}" method="post" enctype="multipart/form-data" class="stacked-form">
+                        @csrf
+                        <label>Archivo CSV</label>
+                        <input type="file" name="scores_file" class="input" accept=".csv,text/csv,text/plain" required />
+                        <button type="submit" class="btn btn-secondary btn-block">Importar notas</button>
+                    </form>
+                </div>
             </section>
 
             {{-- ===================== MIS MATERIAS ===================== --}}
             <section class="tab-panel" data-tab="subjects">
-                @forelse($subjects as $subject)
+                @foreach($subjects as $subject)
                     @php
                         $pending = $pendingBySubject[$subject->id] ?? collect();
                         $averagesByStudent = $subject->scores->groupBy('student_id')->map(fn ($scores) => $scores->avg('value'));
@@ -247,11 +282,13 @@
                             </div>
                         @endif
                     </div>
-                @empty
+                @endforeach
+
+                @if($subjects->isEmpty())
                     <div class="module-card">
                         <p class="muted">Todavía no tienes materias asignadas.</p>
                     </div>
-                @endforelse
+                @endif
             </section>
 
             {{-- ===================== ALERTAS ===================== --}}

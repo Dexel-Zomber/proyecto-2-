@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ImportScoresRequest;
+use App\Http\Requests\StoreScoreRequest;
 use App\Models\Alert;
 use App\Models\Score;
 use App\Models\Subject;
-use App\Models\User;
-use App\Services\AcademicAlertService;
-use Illuminate\Http\Request;
+use App\Services\AuditLogService;
+use App\Services\BulkImportService;
+use App\Services\ScoreService;
 
 class TeacherController extends BaseController
 {
@@ -47,7 +49,7 @@ class TeacherController extends BaseController
         return view('dashboard.teacher', compact('user', 'subjects', 'students', 'pendingBySubject', 'alerts'));
     }
 
-    public function storeScore(Request $request)
+    public function storeScore(StoreScoreRequest $request, ScoreService $scoreService, AuditLogService $auditLogService)
     {
         $user = $this->currentUser();
 
@@ -55,35 +57,43 @@ class TeacherController extends BaseController
             return redirect('/login');
         }
 
-        $validated = $request->validate([
-            'subject_id' => ['required', 'exists:subjects,id'],
-            'student_id' => ['required', 'exists:users,id'],
-            'label' => ['nullable', 'string', 'max:50'],
-            'value' => ['required', 'numeric', 'between:0,100'],
-        ]);
+        $validated = $request->validated();
 
-        $subject = Subject::find($validated['subject_id']);
+        $score = $scoreService->storeTeacherScore($user, $validated);
 
-        if ($subject->teacher_id !== $user->id) {
-            return back()->withErrors(['subject_id' => 'No tiene permiso para usar esta materia']);
-        }
-
-        $label = $validated['label'] ?: 'General';
-
-        $score = Score::updateOrCreate([
-            'student_id' => $validated['student_id'],
-            'subject_id' => $validated['subject_id'],
-            'label' => $label,
-        ], [
-            'value' => $validated['value'],
-        ]);
-
-        AcademicAlertService::syncScoreAlert($score);
+        $auditLogService->record($user, 'scores.saved', "Registro nota {$score->value} para {$score->student?->name}.", Score::class, $score->id, [
+            'student_id' => $score->student_id,
+            'subject_id' => $score->subject_id,
+            'label' => $score->label,
+            'value' => $score->value,
+        ], $request);
 
         return back()->with('message', 'Nota registrada correctamente');
     }
 
-    public function destroyScore(Score $score)
+    public function importScores(ImportScoresRequest $request, BulkImportService $bulkImportService, ScoreService $scoreService, AuditLogService $auditLogService)
+    {
+        $user = $this->currentUser();
+
+        if (! $user || ! $user->isTeacher()) {
+            return redirect('/login');
+        }
+
+        $summary = $bulkImportService->importScores($user, $request->file('scores_file'), $scoreService);
+
+        $auditLogService->record($user, 'scores.imported', 'Importo notas desde archivo CSV.', Score::class, null, [
+            'created' => $summary['created'],
+            'updated' => $summary['updated'],
+            'errors' => count($summary['errors']),
+        ], $request);
+
+        return back()->with('importSummary', [
+            'title' => 'Importacion de notas',
+            ...$summary,
+        ]);
+    }
+
+    public function destroyScore(Score $score, AuditLogService $auditLogService)
     {
         $user = $this->currentUser();
 
@@ -95,12 +105,22 @@ class TeacherController extends BaseController
             return back()->withErrors(['score' => 'No tienes permiso para eliminar esta nota.']);
         }
 
+        $scoreId = $score->id;
+        $studentName = $score->student?->name ?? 'Estudiante';
+        $subjectId = $score->subject_id;
+        $studentId = $score->student_id;
+
         $score->delete();
+
+        $auditLogService->record($user, 'scores.deleted', "Elimino una nota de {$studentName}.", Score::class, $scoreId, [
+            'student_id' => $studentId,
+            'subject_id' => $subjectId,
+        ], request());
 
         return back()->with('message', 'Nota eliminada correctamente');
     }
 
-    public function resolveAlert(Alert $alert)
+    public function resolveAlert(Alert $alert, AuditLogService $auditLogService)
     {
         $user = $this->currentUser();
 
@@ -114,10 +134,14 @@ class TeacherController extends BaseController
 
         $alert->update(['resolved' => true]);
 
+        $auditLogService->record($user, 'alerts.resolved', "Marco alerta resuelta para {$alert->student?->name}.", Alert::class, $alert->id, [
+            'subject_id' => $alert->subject_id,
+        ], request());
+
         return back()->with('message', 'Alerta marcada como resuelta');
     }
 
-    public function unresolveAlert(Alert $alert)
+    public function unresolveAlert(Alert $alert, AuditLogService $auditLogService)
     {
         $user = $this->currentUser();
 
@@ -130,6 +154,10 @@ class TeacherController extends BaseController
         }
 
         $alert->update(['resolved' => false]);
+
+        $auditLogService->record($user, 'alerts.unresolved', "Marco alerta no resuelta para {$alert->student?->name}.", Alert::class, $alert->id, [
+            'subject_id' => $alert->subject_id,
+        ], request());
 
         return back()->with('message', 'Alerta marcada como no resuelta');
     }

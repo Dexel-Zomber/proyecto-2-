@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AiChatRequest;
 use App\Models\Alert;
 use App\Models\Score;
 use App\Services\AiAssistantService;
-use Illuminate\Http\Request;
+use App\Services\RiskAssessmentService;
 
 class StudentController extends BaseController
 {
-    public function index()
+    public function index(RiskAssessmentService $riskAssessmentService)
     {
         $user = $this->currentUser();
 
@@ -28,51 +29,34 @@ class StudentController extends BaseController
             ->get();
 
         $average = $scores->avg('value') ?: 0;
-        $recommendations = [];
+        $riskProfile = $riskAssessmentService->assessStudent($user, $scores, $alerts);
+        $recommendations = $riskProfile['recommendations'];
 
-        if ($average < 70) {
-            $recommendations[] = 'Revisa tus materias con notas bajas y pide apoyo a tus profesores.';
-        }
-
-        if ($alerts->count()) {
-            $recommendations[] = 'Sigue las recomendaciones del sistema para mejorar tus resultados.';
-        }
-
-        if ($average >= 70 && $average < 85) {
-            $recommendations[] = 'Mantén el ritmo y revisa las materias donde hayas sacado menos de 80.';
-        }
-
-        if ($average >= 85) {
-            $recommendations[] = 'Excelente desempeño, continúa con el mismo enfoque.';
-        }
-
-        return view('dashboard.student', compact('user', 'scores', 'alerts', 'average', 'recommendations'));
+        return view('dashboard.student', compact('user', 'scores', 'alerts', 'average', 'recommendations', 'riskProfile'));
     }
 
-    public function aiChat(Request $request)
+    public function aiChat(AiChatRequest $request)
     {
         $user = $this->currentUser();
 
-        $validated = $request->validate([
-            'question' => ['required', 'string', 'max:500'],
-        ]);
+        $validated = $request->validated();
 
         $scores = Score::where('student_id', $user->id)
             ->with('subject')
             ->get()
-            ->map(fn ($s) => [
-                'subject' => $s->subject?->name ?? 'Materia',
-                'label' => $s->label,
-                'value' => $s->value,
+            ->map(fn ($score) => [
+                'subject' => $score->subject?->name ?? 'Materia',
+                'label' => $score->label,
+                'value' => $score->value,
             ])->all();
 
         $alerts = Alert::where('student_id', $user->id)
             ->where('resolved', false)
             ->with('subject')
             ->get()
-            ->map(fn ($a) => [
-                'subject' => $a->subject?->name ?? 'General',
-                'message' => $a->message,
+            ->map(fn ($alert) => [
+                'subject' => $alert->subject?->name ?? 'General',
+                'message' => $alert->message,
             ])->all();
 
         $answer = AiAssistantService::chatWithStudent($user, $scores, $alerts, $validated['question']);
